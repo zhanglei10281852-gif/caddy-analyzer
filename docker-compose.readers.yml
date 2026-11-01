@@ -1,0 +1,64 @@
+services:
+  docker-reader:
+    build:
+      context: .
+      args:
+        VERSION: reader-env
+    profiles: ["docker-reader"]
+    command: ["docker://${DOCKER_LOG_CONTAINER:-caddy}"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "${DOCKER_GID:-0}"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  kubernetes-reader:
+    build:
+      context: .
+      args:
+        VERSION: reader-env
+    profiles: ["kubernetes-reader"]
+    command:
+      - "k8s://${KUBE_NAMESPACE:-default}/${KUBE_POD:-caddy-0}"
+    environment:
+      KUBECONFIG: /home/caddy/.kube/config
+    volumes:
+      - ${KUBECONFIG:-${HOME}/.kube/config}:/home/caddy/.kube/config:ro
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  journal-reader:
+    build:
+      context: .
+      args:
+        VERSION: reader-env
+    profiles: ["journal-reader"]
+    command: ["journalctl://${JOURNAL_UNIT:-caddy.service}"]
+    volumes:
+      - /run/log/journal:/run/log/journal:ro
+      - /var/log/journal:/var/log/journal:ro
+      - /etc/machine-id:/etc/machine-id:ro
+    # Set JOURNAL_GID to the host systemd-journal group. Set
+    # JOURNAL_USER=0 only when the mounted journal ACL does not grant that
+    # group access (common for copied/exported journals in CI).
+    user: "${JOURNAL_USER:-caddy}"
+    group_add:
+      - "${JOURNAL_GID:-0}"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
